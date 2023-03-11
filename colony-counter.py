@@ -16,12 +16,12 @@ from skimage.morphology import (
 from skimage.measure import label, regionprops, regionprops_table
 print("[1] Importing done!")
 
-def count_colonies(path):
-    colony_image = imread(path)
+def count_colonies(image_path):
+    colony_image = imread(image_path)
     imshow(colony_image)
     plt.show()
     
-    grayscaled_image, binarized_image = binarize_image(colony_image, 0.7)
+    grayscaled_image, binarized_image = binarize_image(colony_image, 0.5)
     imshow(grayscaled_image)
     plt.show()
     imshow(binarized_image)
@@ -43,12 +43,15 @@ def count_colonies(path):
         "eccentricity",
         "orientation"
     ]
-    df = pd.DataFrame(regionprops_table(labeled_image, grayscaled_image, properties=properties))
+    rt = regionprops_table(labeled_image, grayscaled_image, properties=properties)
+    df = pd.DataFrame(rt)
 
     print("Region properties DataFrame:")
     print(df)
 
-    filtered_count = filter_regions(regions)
+    filtered_count, indices = filter_regions(regions)
+
+    hide_filtered_regions(colony_image, labeled_image, indices)
     return filtered_count
 
 def binarize_image(image, threshold):
@@ -83,10 +86,26 @@ def filter_regions(regions):
     for i, r in enumerate(regions):
         area = r.area
         convex_area = r.convex_area
+        eccentricity = r.eccentricity
 
+        ### this filter leaves you with obvious colonies
+        # if (
+        #     i != 0 and
+        #     area > avg_area and
+        #     eccentricity < 0.625
+        #     # convex_area / area < 1.05 and
+        #     # convex_area / area > 0.95
+        # ):
+        #     masks.append(regions[i].convex_image)
+        #     bbox.append(regions[i].bbox)   
+        #     indices.append(i)
+
+
+        ### this filter leaves you with non-obvious colonies
         if (
             i != 0 and
-            area > avg_area
+            area > avg_area and
+            eccentricity >= 0.625
             # convex_area / area < 1.05 and
             # convex_area / area > 0.95
         ):
@@ -98,7 +117,22 @@ def filter_regions(regions):
     print(f"Filtered out {len(regions) - filtered_count} regions out of {len(regions)} regions.")
     print(f"Final region count: {filtered_count}.")
 
-    return filtered_count
+    return filtered_count, indices
+
+def hide_filtered_regions(original_image, labeled_image, indices):
+    rgb_mask = np.zeros_like(labeled_image)
+    for i in indices:
+        rgb_mask += (labeled_image == i + 1).astype(int)
+
+    red   = original_image[:,:,0] * rgb_mask
+    green = original_image[:,:,1] * rgb_mask
+    blue  = original_image[:,:,2] * rgb_mask
+
+    filtered_image = np.dstack([red, green, blue])
+    print("Filtered image shown now.")
+    imshow(filtered_image)
+    plt.show()
+    return
 
 if __name__ == "__main__":
     # python colony-counter.py -help
