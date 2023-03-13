@@ -1,14 +1,17 @@
 # colony-counter
 Colony Counter is a tool written in Python used to aid in MMEJ (microhomology-mediated end joining) research by counting the total number of cell colonies in an image. It leverages the combined power of NumPy and Scikit to accomplish this.
 
+![colony-plots](https://user-images.githubusercontent.com/20894826/224611605-6bbcacec-b4e6-417f-a686-6e1cdabf7352.png)
+*Plots of filtered image.*
+
 ## Basic usage
 #### To run on a single image:
 
 `python colony-counter.py /path/to/file.png /path/to/save/directory`
 
 This command will generate 3 files:
-- `low-ecc-regions`: this image ideally contains all singular colonies. Regions in this image have low-eccentricity (are circle-like) and are within 1.5 standard deviations of the average region size.
-- `low-ecc-oob-regions`: this image contains colony clusters and noise. Regions in this image have low-eccentricity (are circle-like), but are outside the 1.5 standard deviation range from the average region size. 
+- `low-ecc-regions-in-size-range`: this image ideally contains all singular colonies. Regions in this image have low-eccentricity (are circle-like) and are within 1.5 standard deviations of the average region size.
+- `low-ecc-regions-out-size-range`: this image contains colony clusters and noise. Regions in this image have low-eccentricity (are circle-like), but are outside the 1.5 standard deviation range from the average region size. 
 - `high-ecc-regions`: this image ideally contains all colony clusters. Regions in this image have high-eccentricity (are oval-like). Visual artifacts (e.g. the wall of the petri dish) are usually present as well.
 
 Users are advised to check over each resultant image and add or subtract from the given count whenever an unexpected region is detected.
