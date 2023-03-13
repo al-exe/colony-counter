@@ -3,35 +3,24 @@ import sys
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from skimage.io import imread, imshow
+
+from skimage.io import imread, imsave, imshow
 from skimage.color import rgb2gray
-from skimage.morphology import (
-    erosion,
-    dilation,
-    closing,
-    opening,
-    area_closing,
-    area_opening
-)
 from skimage.measure import label, regionprops, regionprops_table
 print("[1] Importing done!")
 
-def count_colonies(image_path):
+def count_colonies(image_path, save_path):
     colony_image = imread(image_path)
-    imshow(colony_image)
-    plt.show()
     
-    grayscaled_image, binarized_image = binarize_image(colony_image, 0.5)
-    imshow(grayscaled_image)
-    plt.show()
-    imshow(binarized_image)
-    plt.show()
+    grayscaled_image, binarized_image = binarize_image(colony_image, 0.55)
+    # imshow(binarized_image)
+    # plt.show()
 
     labeled_image = label(binarized_image)
     regions = regionprops(labeled_image)
 
-    imshow(labeled_image)
-    plt.show()
+    # imshow(labeled_image)
+    # plt.show()
 
     properties = [
         "area",
@@ -49,10 +38,27 @@ def count_colonies(image_path):
     print("Region properties DataFrame:")
     print(df)
 
-    filtered_count, indices = filter_regions(regions)
+    obvious_filtered_count, obvious_indices = filter_for_obvious(regions)
+    non_obvious_filtered_count, non_obvious_indices = filter_for_non_obvious(regions)
+    low_ecc_noise_count, low_ecc_indices = filter_for_low_ecc_noise(regions)
 
-    hide_filtered_regions(colony_image, labeled_image, indices)
-    return filtered_count
+    obvious_filtered_image = hide_filtered_regions(colony_image, labeled_image, obvious_indices)
+    non_obvious_filtered_image = hide_filtered_regions(colony_image, labeled_image, non_obvious_indices)
+    low_ecc_noise_filtered_image = hide_filtered_regions(colony_image, labeled_image, low_ecc_indices)
+
+    display_plots(
+        colony_image,
+        obvious_filtered_image,
+        obvious_filtered_count,
+        non_obvious_filtered_image,
+        non_obvious_filtered_count,
+        low_ecc_noise_filtered_image,
+        low_ecc_noise_count,
+        save_path
+    )
+
+    return obvious_filtered_count, non_obvious_filtered_count
+
 
 def binarize_image(image, threshold):
     grayscaled_image = rgb2gray(image)
@@ -60,64 +66,181 @@ def binarize_image(image, threshold):
     return grayscaled_image, binarized_image
 
 
-def filter_regions(regions):
-    print("*** Filtering detected regions ***")
+def filter_for_obvious(regions):
+    print("*** Filtering out HIGH eccentricity regions ***")
     masks = []
-    bbox = []
-    indices = []
+    bboxes = []
+    filtered_indices = []
 
-    avg_area = -1
-    avg_convex_area = -1
+    high_masks = []
+    high_bboxes = []
+    low_eccentricity_indices = []
 
-    # determine averages among regions
+    areas = []
+    convex_areas = []
+    for i, r in enumerate(regions):
+        eccentricity = r.eccentricity
+
+        if (
+            i != 0 and
+            eccentricity < 0.625
+        ):
+            areas.append(r.area)
+            convex_areas.append(r.convex_area)
+
+            high_masks.append(regions[i].convex_image)
+            high_bboxes.append(regions[i].bbox)
+            low_eccentricity_indices.append(i)
+
+    avg_area = np.average(areas)
+    std_area = np.std(areas)
+
+    avg_convex_area = np.average(convex_areas)
+    std_convex_area = np.std(convex_areas)
+    
+    print(f"Average low-ecc. area: {avg_area}. Std. low-ecc. area: {std_area}")
+
     for i, r in enumerate(regions):
         area = r.area
-        convex_area = r.convex_area
 
-        avg_area += area
-        avg_convex_area += convex_area
+        if (
+            i != 0 and
+            i in low_eccentricity_indices and
+            area <= avg_area + 1.5 * std_area and
+            area >= avg_area - 1.5 * std_area
+        ):
+            masks.append(regions[i].convex_image)
+            bboxes.append(regions[i].bbox)
+            filtered_indices.append(i)
 
-    avg_area /= len(regions)
-    avg_convex_area /= len(regions)
+    filtered_count = len(filtered_indices)
 
-    print(f"average region area: {avg_area}")
-    print(f"average region convex area: {avg_convex_area}")
+    print(f"Removed {len(regions) - filtered_count} regions out of {len(regions)} detected regions.")
+    print(f"Total low-ecc. region count: {filtered_count}.")
+            
+    return filtered_count, filtered_indices
+
+
+def filter_for_non_obvious(regions):
+    print("*** Filtering out LOW eccentricity regions ***")
+    masks = []
+    bboxes = []
+    filtered_indices = []
+
+    high_masks = []
+    high_bboxes = []
+    high_eccentricity_indices = []
 
     for i, r in enumerate(regions):
         area = r.area
         convex_area = r.convex_area
         eccentricity = r.eccentricity
 
-        ### this filter leaves you with obvious colonies
-        # if (
-        #     i != 0 and
-        #     area > avg_area and
-        #     eccentricity < 0.625
-        #     # convex_area / area < 1.05 and
-        #     # convex_area / area > 0.95
-        # ):
-        #     masks.append(regions[i].convex_image)
-        #     bbox.append(regions[i].bbox)   
-        #     indices.append(i)
-
-
-        ### this filter leaves you with non-obvious colonies
+        ### this filter leaves you with non-obvious clusters and potential noise
         if (
             i != 0 and
-            area > avg_area and
             eccentricity >= 0.625
-            # convex_area / area < 1.05 and
-            # convex_area / area > 0.95
+        ):
+            high_masks.append(regions[i].convex_image)
+            high_bboxes.append(regions[i].bbox)
+            high_eccentricity_indices.append(i)
+
+    # Iterate over all regions and filter for low eccentricity regions (singular colonies).
+    # Calculate singular colony 
+    areas = []
+    convex_areas = []
+    for i, r in enumerate(regions):
+        area = r.area
+        convex_area = r.area
+
+        if (
+            i != 0 and
+            i in high_eccentricity_indices
+        ):
+            areas.append(area)
+            convex_areas.append(convex_area)
+
+    avg_area = np.average(areas)
+    std_area = np.std(areas)
+
+    avg_convex_area = np.average(convex_areas)
+    std_convex_area = np.std(convex_areas)
+ 
+    for i, r in enumerate(regions):
+        area = r.area
+        convex_area = r.area
+
+        if (
+            i != 0 and
+            i in high_eccentricity_indices
+            # area >= avg_area + 0.5 * std_area or
+            # area <= avg_area - 0.5 * std_area
         ):
             masks.append(regions[i].convex_image)
-            bbox.append(regions[i].bbox)   
-            indices.append(i)
+            bboxes.append(regions[i].bbox)
+            filtered_indices.append(i)
 
-    filtered_count = len(masks)
-    print(f"Filtered out {len(regions) - filtered_count} regions out of {len(regions)} regions.")
+    filtered_count = len(filtered_indices)
+
+    print(f"Removed {len(regions) - filtered_count} regions out of {len(regions)} regions.")
     print(f"Final region count: {filtered_count}.")
 
-    return filtered_count, indices
+    return filtered_count, filtered_indices
+
+
+def filter_for_low_ecc_noise(regions):
+    masks = []
+    bboxes = []
+    filtered_indices = []
+
+    high_masks = []
+    high_bboxes = []
+    noise_indices = []
+
+    areas = []
+    convex_areas = []
+    for i, r in enumerate(regions):
+        eccentricity = r.eccentricity
+
+        if (
+            i != 0 and
+            eccentricity < 0.625
+        ):
+            areas.append(r.area)
+            convex_areas.append(r.convex_area)
+
+            high_masks.append(regions[i].convex_image)
+            high_bboxes.append(regions[i].bbox)
+            noise_indices.append(i)
+
+    avg_area = np.average(areas)
+    std_area = np.std(areas)
+
+    avg_convex_area = np.average(convex_areas)
+    std_convex_area = np.std(convex_areas)
+    
+    print(f"Average low-ecc. area: {avg_area}. Std. low-ecc. area: {std_area}")
+
+    for i, r in enumerate(regions):
+        area = r.area
+
+        if (
+            i != 0 and
+            i in noise_indices and
+            area >= avg_area + 1.5 * std_area or
+            area <= avg_area - 1.5 * std_area
+        ):
+            masks.append(regions[i].convex_image)
+            bboxes.append(regions[i].bbox)
+            filtered_indices.append(i)
+
+    filtered_count = len(filtered_indices)
+
+    print(f"Removed {len(regions) - filtered_count} regions out of {len(regions)} detected regions.")
+    print(f"Total low-ecc. region count: {filtered_count}.")
+            
+    return filtered_count, filtered_indices
+
 
 def hide_filtered_regions(original_image, labeled_image, indices):
     rgb_mask = np.zeros_like(labeled_image)
@@ -129,10 +252,48 @@ def hide_filtered_regions(original_image, labeled_image, indices):
     blue  = original_image[:,:,2] * rgb_mask
 
     filtered_image = np.dstack([red, green, blue])
-    print("Filtered image shown now.")
-    imshow(filtered_image)
+    # imshow(filtered_image)
+    # plt.show()
+
+    return filtered_image
+
+
+def display_plots(
+        original_image,
+        obvious_image,
+        obvious_count,
+        non_obvious_image,
+        non_obvious_count,
+        low_ecc_noise_image,
+        low_ecc_noise_count,
+        save_path
+    ):
+    fig, ax = plt.subplots(nrows=2, ncols=2, figsize=(8, 3))
+
+    ax[0][0].imshow(original_image, cmap='gray')
+    ax[0][0].set_title('Original image', fontsize=20)
+
+    ax[0][1].imshow(obvious_image, cmap='gray')
+    ax[0][1].set_title(r'Low-ecc. regions: %i' % obvious_count, fontsize=20)
+
+    ax[1][0].imshow(non_obvious_image, cmap='gray')
+    ax[1][0].set_title(r'High-ecc. regions: %i' % non_obvious_count, fontsize=20)
+
+    ax[1][1].imshow(low_ecc_noise_image, cmap='gray')
+    ax[1][1].set_title(r'Low-ecc. regions outside size range: %i' % low_ecc_noise_count, fontsize=20)
+
+    for a in ax:
+        for row in a:
+            row.axis('off')
+
+    imsave(f"{save_path}/low-ecc-regions.png", obvious_image)
+    imsave(f"{save_path}/high-ecc-regions.png", non_obvious_image)
+    imsave(f"{save_path}/low-ecc-oob-regions.png", low_ecc_noise_image)
+    imsave(f"{save_path}/high-ecc-oob-regions.png", low_ecc_noise_image)
+
+    fig.tight_layout()
     plt.show()
-    return
+
 
 if __name__ == "__main__":
     # python colony-counter.py -help
@@ -146,4 +307,8 @@ if __name__ == "__main__":
     elif first_arg == "-about":
         pass
     elif first_arg == "-a":
-        count_colonies(sys.argv[4])
+        obvious_count, non_obvious_count = count_colonies(sys.argv[4], sys.argv[5])
+
+        print(f"Detected {obvious_count} simple regions.")
+        print(f"Detected {non_obvious_count} complex regions.")
+        print(f"Please refer to the both filtered images and double-check.")
