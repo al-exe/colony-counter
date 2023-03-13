@@ -250,7 +250,7 @@ def display_plots(
     ax[0][0].set_title('Original image', fontsize=20)
 
     ax[0][1].imshow(obvious_image, cmap='gray')
-    ax[0][1].set_title(r'Low-ecc. regions: %i' % obvious_count, fontsize=20)
+    ax[0][1].set_title(r'Low-ecc. regions inside size range: %i' % obvious_count, fontsize=20)
 
     ax[1][0].imshow(non_obvious_image, cmap='gray')
     ax[1][0].set_title(r'High-ecc. regions: %i' % non_obvious_count, fontsize=20)
@@ -262,9 +262,9 @@ def display_plots(
         for row in a:
             row.axis('off')
 
-    imsave(f"{save_path}/low-ecc-regions.png", obvious_image)
+    imsave(f"{save_path}/low-ecc-regions-in-size-range.png", obvious_image)
     imsave(f"{save_path}/high-ecc-regions.png", non_obvious_image)
-    imsave(f"{save_path}/low-ecc-oob-regions.png", low_ecc_noise_image)
+    imsave(f"{save_path}/low-ecc-regions-out-size-range.png", low_ecc_noise_image)
 
     fig.tight_layout()
     plt.show()
@@ -274,6 +274,6 @@ if __name__ == "__main__":
     # python colony-counter.py /path/to/file.png /path/to/save
     low_ecc_count, high_ecc_count, low_ecc_noise_count = count_colonies(sys.argv[1], sys.argv[2])
 
-    print(f"Detected {low_ecc_count} low-ecc. regions.")
+    print(f"Detected {low_ecc_count} low-ecc. regions inside size range.")
     print(f"Detected {low_ecc_noise_count} low-ecc. regions outside size range.")
     print(f"Detected {high_ecc_count} high-ecc. regions.")
