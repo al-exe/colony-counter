@@ -6,6 +6,7 @@ import matplotlib.pyplot as plt
 from skimage.io import imread, imsave, imshow
 from skimage.color import rgb2gray
 from skimage.measure import label, regionprops, regionprops_table
+from skimage.morphology import remove_small_objects
 
 def count_colonies(image_path, save_path):
     colony_image = imread(image_path)
@@ -35,17 +36,21 @@ def count_colonies(image_path, save_path):
     non_obvious_filtered_count, non_obvious_indices = filter_for_non_obvious(regions)
     low_ecc_noise_count, low_ecc_indices = filter_for_low_ecc_noise(regions)
 
-    obvious_filtered_image = hide_filtered_regions(colony_image, labeled_image, obvious_indices)
-    non_obvious_filtered_image = hide_filtered_regions(colony_image, labeled_image, non_obvious_indices)
-    low_ecc_noise_filtered_image = hide_filtered_regions(colony_image, labeled_image, low_ecc_indices)
+    low_ecc_in_range = hide_filtered_regions(colony_image, labeled_image, obvious_indices)
+    low_ecc_out_range = hide_filtered_regions(colony_image, labeled_image, low_ecc_indices)
+    high_ecc = hide_filtered_regions(colony_image, labeled_image, non_obvious_indices)
+
+    # low_ecc_in_range = remove_small_objects(low_ecc_in_range_filtered_image, 10)
+    # low_ecc_out_range = remove_small_objects(high_ecc_filtered_image, 10)
+    # high_ecc = remove_small_objects(low_ecc_out_range_filtered_image, 10)
 
     display_plots(
         colony_image,
-        obvious_filtered_image,
+        low_ecc_in_range,
         obvious_filtered_count,
-        non_obvious_filtered_image,
+        high_ecc,
         non_obvious_filtered_count,
-        low_ecc_noise_filtered_image,
+        low_ecc_out_range,
         low_ecc_noise_count,
         save_path
     )
@@ -96,8 +101,9 @@ def filter_for_obvious(regions):
         if (
             i != 0 and
             i in low_eccentricity_indices and
-            area <= avg_area + 1.5 * std_area and
-            area >= avg_area - 1.5 * std_area
+            area <= avg_area + 1 * std_area and
+            area >= avg_area - 1 * std_area and 
+            area >= 10
         ):
             masks.append(regions[i].convex_image)
             bboxes.append(regions[i].bbox)
@@ -158,9 +164,8 @@ def filter_for_non_obvious(regions):
 
         if (
             i != 0 and
-            i in high_eccentricity_indices
-            # area >= avg_area + 0.5 * std_area or
-            # area <= avg_area - 0.5 * std_area
+            i in high_eccentricity_indices and
+            area >= 10
         ):
             masks.append(regions[i].convex_image)
             bboxes.append(regions[i].bbox)
@@ -208,8 +213,11 @@ def filter_for_low_ecc_noise(regions):
         if (
             i != 0 and
             i in noise_indices and
-            area >= avg_area + 1.5 * std_area or
-            area <= avg_area - 1.5 * std_area
+            (
+                area >= avg_area + 1 * std_area or
+                area <= avg_area - 1 * std_area
+            ) and
+            area >= 10
         ):
             masks.append(regions[i].convex_image)
             bboxes.append(regions[i].bbox)
