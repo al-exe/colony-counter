@@ -1,4 +1,3 @@
-print("[0] Initializing dependency importing...")
 import sys
 import numpy as np
 import pandas as pd
@@ -7,20 +6,14 @@ import matplotlib.pyplot as plt
 from skimage.io import imread, imsave, imshow
 from skimage.color import rgb2gray
 from skimage.measure import label, regionprops, regionprops_table
-print("[1] Importing done!")
 
 def count_colonies(image_path, save_path):
     colony_image = imread(image_path)
-    
+
     grayscaled_image, binarized_image = binarize_image(colony_image, 0.55)
-    # imshow(binarized_image)
-    # plt.show()
 
     labeled_image = label(binarized_image)
     regions = regionprops(labeled_image)
-
-    # imshow(labeled_image)
-    # plt.show()
 
     properties = [
         "area",
@@ -57,7 +50,7 @@ def count_colonies(image_path, save_path):
         save_path
     )
 
-    return obvious_filtered_count, non_obvious_filtered_count
+    return obvious_filtered_count, non_obvious_filtered_count, low_ecc_noise_count
 
 
 def binarize_image(image, threshold):
@@ -67,7 +60,6 @@ def binarize_image(image, threshold):
 
 
 def filter_for_obvious(regions):
-    print("*** Filtering out HIGH eccentricity regions ***")
     masks = []
     bboxes = []
     filtered_indices = []
@@ -97,8 +89,6 @@ def filter_for_obvious(regions):
 
     avg_convex_area = np.average(convex_areas)
     std_convex_area = np.std(convex_areas)
-    
-    print(f"Average low-ecc. area: {avg_area}. Std. low-ecc. area: {std_area}")
 
     for i, r in enumerate(regions):
         area = r.area
@@ -115,14 +105,10 @@ def filter_for_obvious(regions):
 
     filtered_count = len(filtered_indices)
 
-    print(f"Removed {len(regions) - filtered_count} regions out of {len(regions)} detected regions.")
-    print(f"Total low-ecc. region count: {filtered_count}.")
-            
     return filtered_count, filtered_indices
 
 
 def filter_for_non_obvious(regions):
-    print("*** Filtering out LOW eccentricity regions ***")
     masks = []
     bboxes = []
     filtered_indices = []
@@ -182,9 +168,6 @@ def filter_for_non_obvious(regions):
 
     filtered_count = len(filtered_indices)
 
-    print(f"Removed {len(regions) - filtered_count} regions out of {len(regions)} regions.")
-    print(f"Final region count: {filtered_count}.")
-
     return filtered_count, filtered_indices
 
 
@@ -218,8 +201,6 @@ def filter_for_low_ecc_noise(regions):
 
     avg_convex_area = np.average(convex_areas)
     std_convex_area = np.std(convex_areas)
-    
-    print(f"Average low-ecc. area: {avg_area}. Std. low-ecc. area: {std_area}")
 
     for i, r in enumerate(regions):
         area = r.area
@@ -236,9 +217,6 @@ def filter_for_low_ecc_noise(regions):
 
     filtered_count = len(filtered_indices)
 
-    print(f"Removed {len(regions) - filtered_count} regions out of {len(regions)} detected regions.")
-    print(f"Total low-ecc. region count: {filtered_count}.")
-            
     return filtered_count, filtered_indices
 
 
@@ -252,8 +230,6 @@ def hide_filtered_regions(original_image, labeled_image, indices):
     blue  = original_image[:,:,2] * rgb_mask
 
     filtered_image = np.dstack([red, green, blue])
-    # imshow(filtered_image)
-    # plt.show()
 
     return filtered_image
 
@@ -289,26 +265,15 @@ def display_plots(
     imsave(f"{save_path}/low-ecc-regions.png", obvious_image)
     imsave(f"{save_path}/high-ecc-regions.png", non_obvious_image)
     imsave(f"{save_path}/low-ecc-oob-regions.png", low_ecc_noise_image)
-    imsave(f"{save_path}/high-ecc-oob-regions.png", low_ecc_noise_image)
 
     fig.tight_layout()
     plt.show()
 
 
 if __name__ == "__main__":
-    # python colony-counter.py -help
-    # python colony-counter.py -about
-    # python colony-counter.py -a count -p ~/path/to/file.png
+    # python colony-counter.py /path/to/file.png /path/to/save
+    low_ecc_count, high_ecc_count, low_ecc_noise_count = count_colonies(sys.argv[1], sys.argv[2])
 
-    first_arg = sys.argv[1]
-
-    if first_arg == "-help":
-        print("Basic usage: python colony-counter.py -a count -p ~/path/to/file.png")
-    elif first_arg == "-about":
-        pass
-    elif first_arg == "-a":
-        obvious_count, non_obvious_count = count_colonies(sys.argv[4], sys.argv[5])
-
-        print(f"Detected {obvious_count} simple regions.")
-        print(f"Detected {non_obvious_count} complex regions.")
-        print(f"Please refer to the both filtered images and double-check.")
+    print(f"Detected {low_ecc_count} low-ecc. regions.")
+    print(f"Detected {low_ecc_noise_count} low-ecc. regions outside size range.")
+    print(f"Detected {high_ecc_count} high-ecc. regions.")
