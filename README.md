@@ -1,13 +1,16 @@
-# colony-counter
-Colony Counter is a tool written in Python used to aid in MMEJ (microhomology-mediated end joining) research by counting the total number of cell colonies in an image. It leverages the combined power of NumPy and Scikit to accomplish this.
+## Description
+Colony Counter is a Python tool used to assist in MMEJ (microhomology-mediated end joining) research by counting the total number of cell colonies in an image. This project has been superseded by [Colony Clicker](https://github.com/al-exe/al-exe.github.io).
 
 ![colony-plots](https://user-images.githubusercontent.com/20894826/224611605-6bbcacec-b4e6-417f-a686-6e1cdabf7352.png)
-*Plots of filtered image.*
+*Plots of a processed image.*
 
 ## Basic usage
 #### To run on a single image:
 
-`python colony-counter.py /path/to/file.png /path/to/save/directory`
+```
+$ npm install
+$ python colony-counter.py /path/to/file.png /path/to/save/directory
+```
 
 This command will generate 3 files:
 - `low-ecc-regions-in-size-range`: this image ideally contains all singular colonies. Regions in this image have low-eccentricity (are circle-like) and are within 1.5 standard deviations of the average region size.
