@@ -1,5 +1,5 @@
 ## Description
-Colony Counter is a Python tool used to assist in MMEJ (microhomology-mediated end joining) research by counting the total number of cell colonies in an image. This project has been superseded by [Colony Clicker](https://github.com/al-exe/al-exe.github.io).
+Colony Counter is a Python tool used to assist in MMEJ (microhomology-mediated end joining) research by counting the total number of cell colonies in an image. It has been superseded by [Colony Clicker](https://github.com/al-exe/al-exe.github.io).
 
 ![colony-plots](https://user-images.githubusercontent.com/20894826/224611605-6bbcacec-b4e6-417f-a686-6e1cdabf7352.png)
 *Plots of a processed image.*
